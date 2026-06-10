@@ -54,9 +54,9 @@ GAMES = {
 
 @dp.message(Command("start"))
 async def start(message: Message):
-    text = "✨ **Xush kelibsiz!** Donat xizmatini tanlang:"
+    text = "✨ **Xush kelibsiz!** \n\nDonat xizmatini tanlang:"
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=GAMES[g]["name"], callback_data=f"game_{g}")] for g in GAMES])
-    await message.answer(text, reply_markup=kb)
+    await message.answer(text, reply_markup=kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data.startswith("game_"))
 async def show_items(callback: types.CallbackQuery):
@@ -93,15 +93,21 @@ async def ask_info(callback: types.CallbackQuery, state: FSMContext):
 async def process_info(message: Message, state: FSMContext):
     data = await state.get_data()
     # Adminga xabar yuborish
-    admin_text = (f"🔔 **YANGI BUYURTMA KELDI!**\n\n👤 Mijoz: {message.from_user.full_name}\n"
+    admin_text = (f"🔔 **YANGI BUYURTMA KELDI!**\n\n"
+                  f"👤 Mijoz: {message.from_user.full_name}\n"
                   f"🆔 Username: @{message.from_user.username or 'Mavjud emas'}\n"
-                  f"🕹 O'yin: {GAMES[data['game']]['name']}\n📦 Paket: {data['item']}\n📝 Ma'lumot: {message.text}")
+                  f"🔗 Link: tg://user?id={message.from_user.id}\n\n"
+                  f"🕹 O'yin: {GAMES[data['game']]['name']}\n"
+                  f"📦 Paket: {data['item']}\n"
+                  f"📝 Ma'lumot: `{message.text}`")
     
-    await bot.send_message(chat_id=ADMIN_ID, text=admin_text)
-    await message.answer("✅ Buyurtmangiz qabul qilindi! Admin tez orada bog'lanadi.")
+    await bot.send_message(chat_id=ADMIN_ID, text=admin_text, parse_mode="Markdown")
+    await message.answer("✅ Buyurtmangiz qabul qilindi! Admin tez orada siz bilan bog'lanadi.")
     await state.clear()
 
 async def main():
+    # Menyu tugmasi (Menu)
+    await bot.set_my_commands([types.BotCommand(command="start", description="Botni ishga tushirish")])
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
