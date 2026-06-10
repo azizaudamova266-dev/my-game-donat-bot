@@ -7,14 +7,20 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 
+# Loglarni yoqish
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=os.getenv("TOKEN"))
+
+# Botni ishga tushirish
+TOKEN = os.getenv("TOKEN")
+ADMIN_ID = os.getenv("ADMIN_ID")
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# Holatlar
 class OrderState(StatesGroup):
     waiting_for_info = State()
 
-# Barcha narxlar to'liq kiritildi
+# Barcha narxlar ro'yxati
 GAMES = {
     "brawlstars": {
         "name": "🎮 Brawl Stars", 
@@ -55,7 +61,6 @@ async def start(message: Message):
 @dp.callback_query(F.data.startswith("game_"))
 async def show_items(callback: types.CallbackQuery):
     game = callback.data.split("_")[1]
-    # Narxlarni tugmalarga chiroyli joylashtiramiz
     buttons = [[InlineKeyboardButton(text=f"{item} — {price} UZS", callback_data=f"buy_{game}_{item.replace(' ', '_')}")] for item, price in GAMES[game]["items"].items()]
     buttons.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="main_menu")])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -87,7 +92,13 @@ async def ask_info(callback: types.CallbackQuery, state: FSMContext):
 @dp.message(OrderState.waiting_for_info)
 async def process_info(message: Message, state: FSMContext):
     data = await state.get_data()
-    await message.answer(f"✅ Buyurtma qabul qilindi!\n\n🕹 O'yin: {GAMES[data['game']]['name']}\n📦 Paket: {data['item']}\n📝 Ma'lumot: {message.text}\n\nAdmin tez orada bog'lanadi.")
+    # Adminga xabar yuborish
+    admin_text = (f"🔔 **YANGI BUYURTMA KELDI!**\n\n👤 Mijoz: {message.from_user.full_name}\n"
+                  f"🆔 Username: @{message.from_user.username or 'Mavjud emas'}\n"
+                  f"🕹 O'yin: {GAMES[data['game']]['name']}\n📦 Paket: {data['item']}\n📝 Ma'lumot: {message.text}")
+    
+    await bot.send_message(chat_id=ADMIN_ID, text=admin_text)
+    await message.answer("✅ Buyurtmangiz qabul qilindi! Admin tez orada bog'lanadi.")
     await state.clear()
 
 async def main():
