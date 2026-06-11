@@ -8,6 +8,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from aiohttp import web
 
 # Loglar
 logging.basicConfig(level=logging.INFO)
@@ -15,12 +16,11 @@ logging.basicConfig(level=logging.INFO)
 # Token va Admin ID
 TOKEN = os.getenv("TOKEN") 
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-CHANNEL_LINK = "https://https://t.me/otziv_dot" 
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Bazani sozlash
+# --- BAZA VA HOLATLAR ---
 def init_db():
     conn = sqlite3.connect('bot_data.db')
     cursor = conn.cursor()
@@ -33,8 +33,8 @@ init_db()
 class OrderState(StatesGroup):
     waiting_for_payment_proof = State()
     waiting_for_info = State()
-    waiting_for_broadcast = State()
 
+# O'yinlar ro'yxati
 GAMES = {
     "brawlstars": {"name": "🎮 Brawl Stars", "items": {"30 Gem": "18.000", "80 Gem": "40.000", "170 Gem": "75.000", "360 Gem": "150.000", "950 Gem": "359.000", "2000 Gem": "710.000", "Brawl Pass": "66.000", "Brawl Pass+": "99.000", "PRO PASS": "179.000"}},
     "pubg": {"name": "🔫 PUBG Mobile", "items": {"60 UC": "13.000", "120 UC": "26.000", "180 UC": "38.000", "325 UC": "62.000", "385 UC": "73.000", "660 UC": "125.000", "720 UC": "137.000", "985 UC": "185.000", "1320 UC": "245.000", "1800 UC": "299.000", "2125 UC": "360.000", "3120 UC": "540.000", "3850 UC": "585.000", "5170 UC": "825.000", "5650 UC": "880.000", "8100 UC": "1.150.000", "12010 UC": "1.725.000", "16200 UC": "2.280.000", "20050 UC": "2.860.000", "24300 UC": "3.400.000", "32400 UC": "4.530.000", "40500 UC": "5.660.000", "50400 UC": "7.100.000", "81000 UC": "11.300.000"}},
@@ -45,13 +45,7 @@ GAMES = {
     "premium": {"name": "💎 Telegram Premium", "items": {"1 oy": "55.000", "3 oy": "175.000", "6 oy": "230.000", "12 oy": "350.000"}}
 }
 
-def get_main_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛒 Donat qilish", callback_data="shop")],
-        [InlineKeyboardButton(text="💬 Sharh qoldirish", url=CHANNEL_LINK)],
-        [InlineKeyboardButton(text="❓ Yordam / FAQ", callback_data="help")]
-    ])
-
+# --- HANDLERS ---
 @dp.message(Command("start"))
 async def start(message: Message):
     conn = sqlite3.connect('bot_data.db')
@@ -59,20 +53,22 @@ async def start(message: Message):
     cursor.execute('INSERT OR IGNORE INTO users (user_id) VALUES (?)', (message.from_user.id,))
     conn.commit()
     conn.close()
-    await message.answer("✨ **@NAVIFYS Donat xizmatiga xush kelibsiz!**", reply_markup=get_main_kb())
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🛒 Donat qilish", callback_data="shop")], [InlineKeyboardButton(text="❓ Yordam", callback_data="help")]])
+    await message.answer("✨ **Donat xizmatiga xush kelibsiz!**", reply_markup=kb)
 
 @dp.callback_query(F.data == "help")
 async def help_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text("❓ **Yordam:**\n1. Donat 5-15 daqiqada tushadi.\n2. Karta: Achilov B.\n3. Admin: @NAVIFYS", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Ortga", callback_data="main_menu")]]))
+    await callback.message.edit_text("❓ **Yordam:**\nAdmin: @NAVIFYS", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Ortga", callback_data="main")]]))
 
-@dp.callback_query(F.data == "main_menu")
-async def back_to_menu(callback: types.CallbackQuery):
-    await callback.message.edit_text("✨ Kerakli xizmatni tanlang:", reply_markup=get_main_kb())
+@dp.callback_query(F.data == "main")
+async def main_menu(callback: types.CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🛒 Donat qilish", callback_data="shop")], [InlineKeyboardButton(text="❓ Yordam", callback_data="help")]])
+    await callback.message.edit_text("✨ **Donat xizmatiga xush kelibsiz!**", reply_markup=kb)
 
 @dp.callback_query(F.data == "shop")
 async def shop(callback: types.CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=GAMES[g]["name"], callback_data=f"game_{g}")] for g in GAMES])
-    kb.inline_keyboard.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="main_menu")])
+    kb.inline_keyboard.append([InlineKeyboardButton(text="🔙 Ortga", callback_data="main")])
     await callback.message.edit_text("🎮 O'yinni tanlang:", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("game_"))
@@ -85,12 +81,9 @@ async def show_items(callback: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("buy_"))
 async def ask_payment(callback: types.CallbackQuery, state: FSMContext):
     _, game, item = callback.data.split("_", 2)
-    item = item.replace("_", " ")
     payment_id = random.randint(10000, 99999)
-    await state.update_data(game=game, item=item, payment_id=payment_id)
-    text = (f"✅ **To‘lov miqdori qabul qilindi!**\n\n🆔 ID: {payment_id}\n💵 Narxi: {GAMES[game]['items'][item]} UZS\n"
-            f"💳 Karta: `4916 9911 4582 4962` (Udamova A)\n\n⏰ 5 daqiqa ichida chekni rasm ko'rinishida yuboring.")
-    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]]), parse_mode="Markdown")
+    await state.update_data(game=game, item=item.replace("_", " "), payment_id=payment_id)
+    await callback.message.edit_text(f"✅ **To‘lov ID:** {payment_id}\n💳 Karta: `5614 6821 1905 5368` (Achilov B)\n📸 Chekni yuboring:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]]), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "confirm_payment")
 async def request_proof(callback: types.CallbackQuery, state: FSMContext):
@@ -100,60 +93,39 @@ async def request_proof(callback: types.CallbackQuery, state: FSMContext):
 @dp.message(OrderState.waiting_for_payment_proof, F.photo)
 async def process_proof(message: Message, state: FSMContext):
     await state.update_data(photo=message.photo[-1].file_id)
-    await message.answer("✅ **Chek qabul qilindi!** Endi o'yin ID yoki ma'lumotni yuboring:")
+    await message.answer("✅ **Chek qabul qilindi!** Endi o'yin ID ni yuboring:")
     await state.set_state(OrderState.waiting_for_info)
 
 @dp.message(OrderState.waiting_for_info)
 async def process_info(message: Message, state: FSMContext):
     data = await state.get_data()
-    await message.answer("⏳ **Buyurtmangiz qabul qilindi!** Admin tekshirmoqda.")
-    admin_text = (f"🔔 **YANGI BUYURTMA!**\n👤 Mijoz: @{message.from_user.username or 'Mijoz'}\n"
-                  f"🕹 O'yin: {GAMES[data['game']]['name']}\n📝 Ma'lumot: {message.text}\n🆔 ID: {data['payment_id']}")
+    admin_text = f"🔔 **YANGI BUYURTMA!**\n👤 Mijoz: @{message.from_user.username}\n🕹 O'yin: {data['game']}\n📝 ID: {message.text}"
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{message.from_user.id}")], [InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{message.from_user.id}")]])
     await bot.send_photo(chat_id=ADMIN_ID, photo=data['photo'], caption=admin_text, reply_markup=kb)
+    await message.answer("⏳ **Buyurtmangiz admin tekshiruvida.**")
     await state.clear()
 
 @dp.callback_query(F.data.startswith("approve_"))
-async def approve_order(callback: types.CallbackQuery):
-    user_id = callback.data.split("_")[1]
-    await bot.send_message(chat_id=user_id, text="✅ **Tabriklaymiz!** To‘lovingiz tasdiqlandi. Donatingiz tushmoqda! 🚀")
-    await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n✅ **Buyurtma bajarildi!**")
+async def approve(callback: types.CallbackQuery):
+    await bot.send_message(callback.data.split("_")[1], "✅ **Tabriklaymiz!** Donatingiz tasdiqlandi.")
+    await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n✅ **Bajarildi!**")
 
 @dp.callback_query(F.data.startswith("reject_"))
-async def reject_order(callback: types.CallbackQuery):
-    user_id = callback.data.split("_")[1]
-    await bot.send_message(chat_id=user_id, text="❌ **Kechirasiz, to‘lovingiz qabul qilinmadi.**")
-    await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n❌ **Buyurtma rad etildi!**")
+async def reject(callback: types.CallbackQuery):
+    await bot.send_message(callback.data.split("_")[1], "❌ **Kechirasiz, to‘lovingiz qabul qilinmadi.**")
+    await callback.message.edit_caption(caption=f"{callback.message.caption}\n\n❌ **Rad etildi!**")
 
-@dp.message(Command("admin"))
-async def admin_panel(message: Message):
-    if message.from_user.id == ADMIN_ID:
-        await message.answer("🛠 Admin panel:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📊 Statistika", callback_data="stats"), InlineKeyboardButton(text="📢 Reklama", callback_data="broadcast")]]))
-
-@dp.callback_query(F.data == "stats")
-async def show_stats(callback: types.CallbackQuery):
-    conn = sqlite3.connect('bot_data.db')
-    count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
-    conn.close()
-    await callback.message.edit_text(f"📊 **Jami foydalanuvchilar:** {count} ta")
-
-@dp.callback_query(F.data == "broadcast")
-async def start_broadcast(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("📢 Reklama matnini yuboring:")
-    await state.set_state(OrderState.waiting_for_broadcast)
-
-@dp.message(OrderState.waiting_for_broadcast)
-async def send_broadcast(message: Message, state: FSMContext):
-    conn = sqlite3.connect('bot_data.db')
-    users = conn.execute('SELECT user_id FROM users').fetchall()
-    conn.close()
-    for user in users:
-        try: await bot.send_message(user[0], message.text)
-        except: pass
-    await message.answer("✅ Reklama yuborildi!")
-    await state.clear()
+# --- Veb-server (Render uchun) ---
+async def web_server_task():
+    app = web.Application()
+    app.router.add_get('/', lambda request: web.Response(text="Bot is running!"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 8080)))
+    await site.start()
 
 async def main():
+    await web_server_task()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
