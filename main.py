@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import sqlite3
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -10,9 +11,19 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+# Bazani sozlash
+def init_db():
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY)')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 class OrderState(StatesGroup):
     waiting_for_payment_proof = State()
@@ -30,8 +41,28 @@ GAMES = {
 
 @dp.message(Command("start"))
 async def start(message: Message):
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO users (user_id) VALUES (?)', (message.from_user.id,))
+    conn.commit()
+    conn.close()
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=GAMES[g]["name"], callback_data=f"game_{g}")] for g in GAMES])
     await message.answer("✨ **Xush kelibsiz!** Kerakli xizmatni tanlang:", reply_markup=kb, parse_mode="Markdown")
+
+@dp.message(Command("admin"))
+async def admin_panel(message: Message):
+    if message.from_user.id == ADMIN_ID:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📊 Statistika", callback_data="stats")]])
+        await message.answer("🛠 **Admin panel:**", reply_markup=kb)
+
+@dp.callback_query(F.data == "stats")
+async def show_stats(callback: types.CallbackQuery):
+    conn = sqlite3.connect('bot_data.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM users')
+    count = cursor.fetchone()[0]
+    conn.close()
+    await callback.message.edit_text(f"📊 **Jami foydalanuvchilar:** {count} ta")
 
 @dp.callback_query(F.data.startswith("game_"))
 async def show_items(callback: types.CallbackQuery):
@@ -51,35 +82,34 @@ async def ask_payment(callback: types.CallbackQuery, state: FSMContext):
     item = item.replace("_", " ")
     await state.update_data(game=game, item=item)
     text = (f"💳 **To'lov jarayoni**\n\nSiz tanladingiz: {item}\nNarxi: {GAMES[game]['items'][item]} UZS\n\n"
-            f"To'lov uchun karta ma'lumotlari:\n💳 Karta: `8600 0000 0000 0000`\n👤 Ism: **Aziza Udamova** (A.U)\n\n"
-            f"To'lov qilgan bo'lsangiz tugmani bosing:")
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")], [InlineKeyboardButton(text="🔙 Ortga", callback_data=f"game_{game}")]])
+            f"Karta: `4916 9911 4582 4962`\nIsm: **Aziza Udamova** (A.U)\n\n"
+            f"To'lovni qilib, chekni yuboring:")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "confirm_payment")
 async def request_proof(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("📸 Iltimos, **to'lov chekini (rasm)** yuboring:")
+    await callback.message.edit_text("📸 **Chekni rasm ko'rinishida yuboring:**")
     await state.set_state(OrderState.waiting_for_payment_proof)
 
 @dp.message(OrderState.waiting_for_payment_proof, F.photo)
 async def process_proof(message: Message, state: FSMContext):
     await state.update_data(photo=message.photo[-1].file_id)
-    data = await state.get_data()
-    texts = {"brawlstars": "📧 Email va Kodni yuboring:", "pubg": "🆔 PUBG ID yuboring:", "stars": "👤 Username yoki ID:", "standoff": "🆔 Standoff ID:", "roblox": "👤 Roblox Username:", "steam": "🆔 Steam ID:", "premium": "👤 Telegram Username:"}
-    await message.answer(texts.get(data['game'], "Ma'lumotni yuboring:"))
+    await message.answer("✅ **Chek qabul qilindi!** Endi o'yin ID yoki ma'lumotni yuboring:")
     await state.set_state(OrderState.waiting_for_info)
 
 @dp.message(OrderState.waiting_for_info)
 async def process_info(message: Message, state: FSMContext):
     data = await state.get_data()
-    admin_text = (f"🔔 **YANGI BUYURTMA!**\n\n👤 Mijoz: {message.from_user.full_name}\n🆔 Username: @{message.from_user.username or 'Yo\'q'}\n"
-                  f"🕹 O'yin: {GAMES[data['game']]['name']}\n📦 Paket: {data['item']}\n📝 Info: `{message.text}`")
-    await bot.send_photo(chat_id=ADMIN_ID, photo=data['photo'], caption=admin_text, parse_mode="Markdown")
-    await message.answer("✅ Buyurtmangiz va chek qabul qilindi! Admin tez orada bog'lanadi.")
+    # AVTOMATIK JAVOB
+    await message.answer("⏳ **Buyurtmangiz qabul qilindi!** Admin tez orada tekshirib, donatni yuklab beradi. Iltimos, kuting.")
+    
+    # ADMINGA YUBORISH
+    admin_text = (f"🔔 **YANGI BUYURTMA!**\n👤 Mijoz: {message.from_user.full_name}\n🕹 O'yin: {GAMES[data['game']]['name']}\n📝 Ma'lumot: {message.text}")
+    await bot.send_photo(chat_id=ADMIN_ID, photo=data['photo'], caption=admin_text)
     await state.clear()
 
 async def main():
-    await bot.set_my_commands([types.BotCommand(command="start", description="Botni ishga tushirish")])
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
