@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 # Token va Admin ID
 TOKEN = os.getenv("TOKEN") 
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-CHANNEL_LINK = "https://t.me/SizningKanalLink" 
+CHANNEL_LINK = "https://https://t.me/otziv_dot" 
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -89,7 +89,7 @@ async def ask_payment(callback: types.CallbackQuery, state: FSMContext):
     payment_id = random.randint(10000, 99999)
     await state.update_data(game=game, item=item, payment_id=payment_id)
     text = (f"✅ **To‘lov miqdori qabul qilindi!**\n\n🆔 ID: {payment_id}\n💵 Narxi: {GAMES[game]['items'][item]} UZS\n"
-            f"💳 Karta: `5614 6821 1905 5368` (Achilov B)\n\n⏰ 5 daqiqa ichida chekni rasm ko'rinishida yuboring.")
+            f"💳 Karta: `4916 9911 4582 4962` (Udamova A)\n\n⏰ 5 daqiqa ichida chekni rasm ko'rinishida yuboring.")
     await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]]), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "confirm_payment")
