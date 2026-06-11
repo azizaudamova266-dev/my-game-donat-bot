@@ -51,7 +51,7 @@ async def ask_payment(callback: types.CallbackQuery, state: FSMContext):
     item = item.replace("_", " ")
     await state.update_data(game=game, item=item)
     text = (f"💳 **To'lov jarayoni**\n\nSiz tanladingiz: {item}\nNarxi: {GAMES[game]['items'][item]} UZS\n\n"
-            f"To'lov uchun karta ma'lumotlari:\n💳 Karta: `4916 9911 4579 4962`\n👤 Ism: **Aziza Udamova** (A.U)\n\n"
+            f"To'lov uchun karta ma'lumotlari:\n💳 Karta: `8600 0000 0000 0000`\n👤 Ism: **Aziza Udamova** (A.U)\n\n"
             f"To'lov qilgan bo'lsangiz tugmani bosing:")
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")], [InlineKeyboardButton(text="🔙 Ortga", callback_data=f"game_{game}")]])
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
