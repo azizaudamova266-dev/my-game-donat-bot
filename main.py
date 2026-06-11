@@ -83,7 +83,7 @@ async def ask_payment(callback: types.CallbackQuery, state: FSMContext):
     _, game, item = callback.data.split("_", 2)
     payment_id = random.randint(10000, 99999)
     await state.update_data(game=game, item=item.replace("_", " "), payment_id=payment_id)
-    await callback.message.edit_text(f"✅ **To‘lov ID:** {payment_id}\n💳 Karta: `5614 6821 1905 5368` (Achilov B)\n📸 Chekni yuboring:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]]), parse_mode="Markdown")
+    await callback.message.edit_text(f"✅ **To‘lov ID:** {payment_id}\n💳 Karta: `4916 9911 4582 4962` (Udamova A)\n📸 Chekni yuboring:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ To'lov qildim", callback_data="confirm_payment")]]), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "confirm_payment")
 async def request_proof(callback: types.CallbackQuery, state: FSMContext):
